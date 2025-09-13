@@ -1237,3 +1237,20 @@ pub extern "C" fn free_modernbert_token_result(result: ModernBertTokenClassifica
         libc::free(result.entities as *mut libc::c_void);
     }
 }
+
+#[allow(dead_code)]
+fn assert_send_sync<T: Send + Sync>() {}
+
+#[test]
+fn check_types_send_sync() {
+    assert_send_sync::<candle_transformers::models::modernbert::ModernBert>();
+    assert_send_sync::<ModernBertClassifier>();
+    assert_send_sync::<ModernBertModel>();
+
+    assert_send_sync::<FixedModernBertForSequenceClassification>();
+    assert_send_sync::<FixedModernBertForTokenClassification>();
+
+    assert_send_sync::<tokenizers::Tokenizer>();
+    assert_send_sync::<candle_core::Tensor>();
+    assert_send_sync::<candle_core::Device>();
+}
