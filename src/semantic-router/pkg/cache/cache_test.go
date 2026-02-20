@@ -3797,6 +3797,46 @@ func TestSearchLayerHeapManagement(t *testing.T) {
 	})
 }
 
+func TestSelectNeighborsRejectsPhantomIndicesFromInvalidCandidates(t *testing.T) {
+	// Regression fixture: when invalid candidates are skipped, selectNeighbors must not
+	// leak zero-value placeholders into the final neighbor list.
+	queryEmbedding := []float32{1.0}
+	entries := []CacheEntry{
+		{Embedding: []float32{0.3}},      // index 0 (not in candidates)
+		{Embedding: []float32{0.2}},      // filler
+		{Embedding: []float32{1.0}},      // valid candidate
+		{Embedding: []float32{1.0, 0.1}}, // invalid: dimension mismatch
+		{Embedding: []float32{}},         // invalid: empty embedding
+	}
+
+	index := newHNSWIndex(4, 8)
+	candidates := []int{2, 3, 4}
+
+	got := index.selectNeighbors(candidates, 2, queryEmbedding, entries)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 neighbors, got %d (%v)", len(got), got)
+	}
+
+	candidateSet := map[int]struct{}{
+		2: {},
+		3: {},
+		4: {},
+	}
+
+	for _, idx := range got {
+		if _, ok := candidateSet[idx]; !ok {
+			t.Fatalf("selectNeighbors returned non-candidate index %d from %v", idx, got)
+		}
+		if len(entries[idx].Embedding) != len(queryEmbedding) {
+			t.Fatalf("selectNeighbors returned invalid-dimension candidate %d from %v", idx, got)
+		}
+	}
+
+	if !slices.Contains(got, 2) {
+		t.Fatalf("expected valid candidate 2 to be preserved, got %v", got)
+	}
+}
+
 // BenchmarkLargeScale tests HNSW vs Linear at scales where HNSW shows advantages (10K-100K entries)
 func BenchmarkLargeScale(b *testing.B) {
 	// Initialize BERT model (GPU by default)
